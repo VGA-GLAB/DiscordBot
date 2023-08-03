@@ -122,7 +122,7 @@ class Program
 
             if (schoolStart > start || start > schoolEnd)
             {
-                line += "◆開放時間:　終日";
+                line += "◆開放時間:　終日 \n";
             }
             else
             {
