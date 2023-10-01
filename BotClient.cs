@@ -1,8 +1,10 @@
 ﻿using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime;
 using System.Runtime.CompilerServices;
@@ -22,7 +24,7 @@ namespace DiscordBot
     {
         DiscordSocketClient _client;
         DiscordRole[] _roles;
-        SocketGuild _guild;
+        SettingData _settings;
 
         Dictionary<string, SocketGuildUser> _userStack = new Dictionary<string, SocketGuildUser>();
 
@@ -30,6 +32,7 @@ namespace DiscordBot
         {
             var configuracoes = new DiscordSocketConfig()
             {
+                LogLevel = LogSeverity.Debug,
                 AlwaysDownloadUsers = true,
                 GatewayIntents = GatewayIntents.All
             };
@@ -44,8 +47,8 @@ namespace DiscordBot
 
         public async Task Run()
         {
-            var settings = LocalData.Load<SettingData>("setting.json");
-            await _client.LoginAsync(TokenType.Bot, settings.BotToken);
+            _settings = LocalData.Load<SettingData>("setting.json");
+            await _client.LoginAsync(TokenType.Bot, _settings.BotToken);
             await _client.StartAsync();
 
             //確認用
@@ -67,9 +70,7 @@ namespace DiscordBot
         private Task onReady()
         {
             Console.WriteLine($"{_client.CurrentUser} is Running!!");
-            var settings = LocalData.Load<SettingData>("setting.json");
-            _guild = _client.GetGuild(settings.GuildId);
-            var roles = _guild.Roles.ToList();
+            var roles = _client.GetGuild(_settings.GuildId).Roles.ToList();
             roles.ForEach(r =>
             {
                 Console.WriteLine(r.Name);
@@ -134,12 +135,6 @@ namespace DiscordBot
 
         private async Task onJoinUser(SocketGuildUser user)
         {
-            //対象チャンネル以外では反応しない
-            if (user.Guild.Id != 1136199339417534606)
-            {
-                return;
-            }
-
             Console.WriteLine(user.Guild.Name);
             Console.WriteLine(user.Username);
 
@@ -152,14 +147,6 @@ namespace DiscordBot
 
         private async Task onMessage(SocketMessage message)
         {
-            //専用チャンネル以外では反応しない
-            /*
-            if(message.Channel.Id != 1157848955946811553)
-            {
-                return;
-            }
-            */
-
             //BOT君の発言は読まない
             if (message.Author.Id == _client.CurrentUser.Id)
             {
@@ -190,17 +177,37 @@ namespace DiscordBot
                 return;
             }
 
-            Console.WriteLine(message.Value);
+            Console.WriteLine(reaction.User.Value);
             Console.WriteLine(reaction.Emote.Name);
 
-            //BOT君の発言は読まない
-            foreach (var r in _roles)
+            try
             {
-                if (reaction.Emote.Name == r.Emoji)
+                //ロール設定する
+                foreach (var r in _roles)
                 {
-                    var user = _guild.Users.Where(u => u.Id == reaction.UserId);
-                    if (user.Count() == 0) break;
-                    await user.First().AddRoleAsync(ulong.Parse(r.RoleId));
+                    if (reaction.Emote.Name == r.Emoji)
+                    {
+                        //var api = new RestAPIWrapper();
+                        //await api.AddRoles(_settings.GuildId, reaction.UserId, ulong.Parse(r.RoleId));
+
+                        var guild = _client.GetGuild(_settings.GuildId);
+                        var user = guild.Users.Where(u => u.Id == reaction.UserId);
+                        if (user.Count() == 0) break;
+
+                        var role = guild.Roles.Where(rr => rr.Id == ulong.Parse(r.RoleId));
+                        if (role.Count() == 0) break;
+
+                        await user.First().AddRoleAsync(role.First());
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                var guild = _client.GetGuild(_settings.GuildId);
+                var user = guild.Users.Where(u => u.Id == reaction.UserId);
+                if (user.Count() > 0)
+                {
+                    await user.First().SendMessageAsync("エラーが出ちゃいました。講師かスタッフにエラー内容を問い合わせてください。\r\nエラー内容:\r\n" + ex.Message);
                 }
             }
         }

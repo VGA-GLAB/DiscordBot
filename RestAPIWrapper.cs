@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
+using System.Runtime;
 using System.Text;
 using System.Threading.Tasks;
 using static Program;
+using static System.Collections.Specialized.BitVector32;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace DiscordBot
@@ -47,6 +49,11 @@ namespace DiscordBot
                 result.Add(role.Name, role);
             }
             return result;
+        }
+        public async Task AddRoles(ulong guildId, ulong userId, ulong roleId)
+        {
+            await Login();
+            await _restCli.AddRoleAsync(guildId, userId, roleId);
         }
     }
 }

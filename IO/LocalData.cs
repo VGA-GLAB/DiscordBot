@@ -29,14 +29,7 @@ class LocalData
             }
 
             var arr = File.ReadAllBytes(path + "/" + file);
-#if RELEASE
-            arr = AesDecrypt(arr);
-#else
-            if (fenc)
-            {
-                arr = AesDecrypt(arr);
-            }
-#endif
+
             string json = Encoding.UTF8.GetString(arr);
             return JsonConvert.DeserializeObject<T>(json);
         }
@@ -65,13 +58,6 @@ class LocalData
                 var bytes = new byte[fs.Length];
                 await fs.ReadAsync(bytes, 0, bytes.Length);
 
-#if RELEASE
-        fenc = true;
-#endif
-                if (fenc)
-                {
-                    bytes = AesDecrypt(bytes);
-                }
                 json = Encoding.UTF8.GetString(bytes);
             }
 
@@ -133,14 +119,6 @@ class LocalData
 
             using (FileStream fs = new FileStream(path + "/" + file, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
             {
-#if RELEASE
-        fenc = true;
-#endif
-                if (fenc)
-                {
-                    bytes = AesEncrypt(bytes);
-                }
-
                 await fs.WriteAsync(bytes, 0, bytes.Length);
             }
         }
