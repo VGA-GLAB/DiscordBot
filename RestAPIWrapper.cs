@@ -27,7 +27,7 @@ namespace DiscordBot
             if (_restCli.LoginState != LoginState.LoggedIn)
             {
                 var settings = LocalData.Load<SettingData>("setting.json");
-                await _restCli.LoginAsync(TokenType.Bot, settings.BotToken);
+                await _restCli.LoginAsync(TokenType.Bot, settings.DiscordBotToken);
             }
         }
 

@@ -1,11 +1,6 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Network;
-using System.Runtime.InteropServices;
+﻿using Notion;
+using Notion.Client;
+using System.Diagnostics;
 using static Program;
 
 namespace DiscordBot
@@ -44,62 +39,64 @@ namespace DiscordBot
         public string Sort;
     }
 
+    public class Notice
+    {
+        public int Type;
+        public int Chain;
+    }
+
     public class NotionWrapper
     {
-        /*
+        SettingData _setting;
+        NotionClient _client;
+
+        public void Setup()
+        {
+            _setting = LocalData.Load<SettingData>("setting.json");
+            _client = NotionClientFactory.Create(new ClientOptions
+            {
+                AuthToken = "secret_3AyEJHx6KjA1mEd6sOdQh5mOsNHmzxFWMVK2Cg6tW5E" //_setting.NotionAPIToken
+            });
+        }
+
         /// <summary>
         /// カレンダー取得用
         /// </summary>
         /// <returns></returns>
-        static public NotionCalendar[] GetCalendar()
+        public async void GetCalendar()
         {
-            string json = null;
-            var settings = LocalData.Load<SettingData>("setting.json");
+            var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了");
+            var queryParams = new DatabasesQueryParameters { Filter = dateFilter };
+            var cancel = new CancellationToken();
+            var pages = await _client.Databases.QueryAsync("42d144766a3d4a7d848768e5e9b37cac", queryParams, cancel);
 
-            int retryCount = 0;
-            while (json == null)
+            List<Notice> notices = new List<Notice>();
+
+            if (pages == null) return;
+            foreach(var p in pages.Results)
             {
-                json = WebRequest.GetRequest(string.Format("https://meodtz40k5.execute-api.ap-northeast-1.amazonaws.com/default/GetConfig/{0}/", settings.CalendarDBId)).GetAwaiter().GetResult();
-                if (json != null) break;
-                Task.Delay(1000).Wait();
-                retryCount++;
-                if(retryCount>3)
+                PropertyValue value;
+
+                p.Properties.TryGetValue("通知ステータス", out value);
+                StatusPropertyValue status = value as StatusPropertyValue;
+                if(status.Status.Name == "予定")
                 {
-                    Console.WriteLine("Error: server error.");
-                    break;
+                    Notice n = new Notice();
+                    n.Type = 1;
                 }
             }
-
-            var objs = JsonConvert.DeserializeObject<NotionCalendar[]>(json);
-            return objs;
         }
-        */
         
         /// <summary>
         /// ロール取得用
         /// </summary>
         /// <returns></returns>
-        static public DiscordRole[] GetDiscordRole()
+        public async void GetDiscordRole()
         {
-            string json = null;
-            var settings = LocalData.Load<SettingData>("setting.json");
+            //var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了");
+            //var queryParams = new DatabasesQueryParameters { Filter = dateFilter };
+            //var pages = await _client.Databases.QueryAsync("fa4bdd28486348028c651b43c4e23feb");
 
-            int retryCount = 0;
-            while (json == null)
-            {
-                json = WebRequest.GetRequest(string.Format("https://meodtz40k5.execute-api.ap-northeast-1.amazonaws.com/default/GetConfig/{0}/", settings.RoleDatabaseId)).GetAwaiter().GetResult();
-                if (json != null) break;
-                Task.Delay(1000).Wait();
-                retryCount++;
-                if(retryCount>3)
-                {
-                    Console.WriteLine("Error: server error.");
-                    break;
-                }
-            }
-
-            var objs = JsonConvert.DeserializeObject<DiscordRole[]>(json);
-            return objs;
         }
 
         /// <summary>
@@ -108,24 +105,7 @@ namespace DiscordBot
         /// <returns></returns>
         static public void SetUserData(string name, string memberId)
         {
-            string json = null;
-            var settings = LocalData.Load<SettingData>("setting.json");
 
-            int retryCount = 0;
-            while (json == null)
-            {
-                /*
-                json = WebRequest.PostRequest("https://meodtz40k5.execute-api.ap-northeast-1.amazonaws.com/default/SetUserData", datas).GetAwaiter().GetResult();
-                */
-                if (json != null) break;
-                Task.Delay(1000).Wait();
-                retryCount++;
-                if (retryCount > 3)
-                {
-                    Console.WriteLine("Error: server error.");
-                    break;
-                }
-            }
         }
     }
 }

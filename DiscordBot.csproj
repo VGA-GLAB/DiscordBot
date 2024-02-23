@@ -10,5 +10,6 @@
   <ItemGroup>
     <PackageReference Include="Discord.NET" Version="3.11.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Notion.Net" Version="4.2.0" />
   </ItemGroup>
 </Project>
