@@ -2,47 +2,30 @@
 using Notion.Client;
 using System.Diagnostics;
 using static Program;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace DiscordBot
 {
-    [Serializable]
-    public class CalendarDate
+    public class Plan
     {
-        public string start;
-        public string end;
-        public string time_zone;
+        public string Id;
+        public string Status;
+        public DateTime SortDate;
+        public string Day;
+        public string Team;
+        public string Place;
+        public string Desc;
+        public string Title;
+        public string Link;
     }
 
-    [Serializable]
-    public class NotionCalendar
+    public class Announce
     {
-        public string[] Tags;
-        public CalendarDate Date;
-        public string[] Place;
-        public string[] Member;
-        public string Name;
-        public string child_id;
-        public string page_type;
-        public string url;
-    }
-
-    [Serializable]
-    public class DiscordRole
-    {
-        public string RoleName;
-        public string[] Tags;
-        public string Emoji;
-        public string RoleId;
-        public string child_id;
-        public string page_type;
-        public string url;
-        public string Sort;
-    }
-
-    public class Notice
-    {
-        public int Type;
-        public int Chain;
+        public DateTime CalcDate;
+        public string Day;
+        public string Desc;
+        public string Status;
+        public List<Plan> Chain = new List<Plan>();
     }
 
     public class NotionWrapper
@@ -50,12 +33,19 @@ namespace DiscordBot
         SettingData _setting;
         NotionClient _client;
 
+        string TimeString(string timeStr)
+        {
+            DateTime end = DateTime.Parse(timeStr);
+            string time = end.ToString("HH:mm");
+            return time;
+        }
+
         public void Setup()
         {
             _setting = LocalData.Load<SettingData>("setting.json");
             _client = NotionClientFactory.Create(new ClientOptions
             {
-                AuthToken = "secret_3AyEJHx6KjA1mEd6sOdQh5mOsNHmzxFWMVK2Cg6tW5E" //_setting.NotionAPIToken
+                AuthToken = _setting.NotionAPIToken
             });
         }
 
@@ -63,40 +53,120 @@ namespace DiscordBot
         /// カレンダー取得用
         /// </summary>
         /// <returns></returns>
-        public async void GetCalendar()
+        public async Task<List<Announce>> GetCalendar()
         {
-            var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了");
+            var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了", isNotEmpty: true);
             var queryParams = new DatabasesQueryParameters { Filter = dateFilter };
             var cancel = new CancellationToken();
-            var pages = await _client.Databases.QueryAsync("42d144766a3d4a7d848768e5e9b37cac", queryParams, cancel);
+            var pages = await _client.Databases.QueryAsync(_setting.CalendarDBId, queryParams, cancel);
 
-            List<Notice> notices = new List<Notice>();
-
-            if (pages == null) return;
+            List<Announce> announce = new List<Announce>();
+            List<Plan> plans = new List<Plan>();
+            
+            if (pages == null) return announce;
             foreach(var p in pages.Results)
             {
+                Plan plan = new Plan();
                 PropertyValue value;
+
+                p.Properties.TryGetValue("日付", out value);
+                DatePropertyValue date = value as DatePropertyValue;
+                if (date.Date.Start != null && date.Date.End != null)
+                {
+                    plan.SortDate = date.Date.Start.Value;
+                    plan.Day = string.Format("{0}～{1}", date?.Date.Start?.ToString("HH:mm"), date?.Date.End?.ToString("HH:mm"));
+                }
+                else
+                {
+                    plan.SortDate = date.Date.Start.Value;
+                    plan.Day = "終日";
+                }
+
+                p.Properties.TryGetValue("メンバー", out value);
+                MultiSelectPropertyValue member = value as MultiSelectPropertyValue;
+                plan.Team = member?.MultiSelect[0].Name;
+
+                p.Properties.TryGetValue("教室", out value);
+                MultiSelectPropertyValue place = value as MultiSelectPropertyValue;
+                plan.Place = place?.MultiSelect[0].Name;
+
+                p.Properties.TryGetValue("用途", out value);
+                RichTextPropertyValue desc = value as RichTextPropertyValue;
+                plan.Desc = desc?.RichText[0].PlainText;
+
+                p.Properties.TryGetValue("予定", out value);
+                TitlePropertyValue title = value as TitlePropertyValue;
+                plan.Title = title?.Title[0].PlainText;
+
+                plan.Id = p.Id;
+                plan.Link = p.Url;
 
                 p.Properties.TryGetValue("通知ステータス", out value);
                 StatusPropertyValue status = value as StatusPropertyValue;
-                if(status.Status.Name == "予定")
-                {
-                    Notice n = new Notice();
-                    n.Type = 1;
-                }
+                plan.Status = status.Status.Name;
+
+                plans.Add(plan);
             }
+
+            plans.Sort((a, b) =>
+            {
+                if (a.SortDate < b.SortDate)
+                    return -1;
+                else if (a.SortDate < b.SortDate)
+                    return 1;
+                else
+                    return 0;
+            });
+
+            Announce an = new Announce();
+            an.CalcDate = plans[0].SortDate;
+            an.Day = plans[0].SortDate.ToString("M");
+            an.Desc = plans[0].Desc;
+            an.Status = plans[0].Status;
+            an.Chain.Add(plans[0]);
+            for (int i=1; i< plans.Count; ++i)
+            {
+                if(an.CalcDate.Day != plans[i].SortDate.Day && an.Desc != plans[i].Desc)
+                {
+                    announce.Add(an);
+                    an = new Announce();
+                    an.CalcDate = plans[i].SortDate;
+                    an.Day = plans[i].SortDate.ToString("M");
+                    an.Desc = plans[i].Desc;
+                    an.Status = plans[i].Status;
+                }
+                an.Chain.Add(plans[i]);
+            }
+            announce.Add(an);
+            return announce;
         }
         
         /// <summary>
         /// ロール取得用
         /// </summary>
         /// <returns></returns>
-        public async void GetDiscordRole()
+        public async Task<int> UpdateStatus(Announce an)
         {
-            //var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了");
-            //var queryParams = new DatabasesQueryParameters { Filter = dateFilter };
-            //var pages = await _client.Databases.QueryAsync("fa4bdd28486348028c651b43c4e23feb");
+            foreach(var plan in an.Chain)
+            {
+                DatabasesUpdateParameters updateParam = new DatabasesUpdateParameters();
+                StatusPropertyValue value = new StatusPropertyValue() { Status = new StatusPropertyValue.Data() { Name = "リマインド" } };
+                Dictionary<string, PropertyValue> updateParams = new Dictionary<string, PropertyValue>();
+                switch (plan.Status)
+                {
+                    case "予定":
+                        value.Status.Name = "リマインド";
+                        updateParams.Add("通知ステータス", value);
+                        break;
 
+                    case "リマインド":
+                        value.Status.Name = "完了";
+                        updateParams.Add("通知ステータス", value);
+                        break;
+                }
+                await _client.Pages.UpdatePropertiesAsync(plan.Id, updateParams);
+            }
+            return 0;
         }
 
         /// <summary>
