@@ -55,7 +55,7 @@ namespace DiscordBot
         /// <returns></returns>
         public async Task<List<Announce>> GetCalendar()
         {
-            var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了", isNotEmpty: true);
+            var dateFilter = new StatusFilter("通知ステータス", doesNotEqual: "完了");
             var queryParams = new DatabasesQueryParameters { Filter = dateFilter };
             var cancel = new CancellationToken();
             var pages = await _client.Databases.QueryAsync(_setting.CalendarDBId, queryParams, cancel);
@@ -68,6 +68,13 @@ namespace DiscordBot
             {
                 Plan plan = new Plan();
                 PropertyValue value;
+
+                p.Properties.TryGetValue("通知ステータス", out value);
+                StatusPropertyValue status = value as StatusPropertyValue;
+                if (status.Status == null)
+                    continue;
+
+                plan.Status = status.Status.Name;
 
                 p.Properties.TryGetValue("日付", out value);
                 DatePropertyValue date = value as DatePropertyValue;
@@ -84,26 +91,42 @@ namespace DiscordBot
 
                 p.Properties.TryGetValue("メンバー", out value);
                 MultiSelectPropertyValue member = value as MultiSelectPropertyValue;
-                plan.Team = member?.MultiSelect[0].Name;
+                if (member?.MultiSelect.Count > 0)
+                {
+                    plan.Team = member?.MultiSelect[0].Name;
+                }
+                else
+                {
+                    plan.Team = "全チーム";
+                }
 
                 p.Properties.TryGetValue("教室", out value);
                 MultiSelectPropertyValue place = value as MultiSelectPropertyValue;
-                plan.Place = place?.MultiSelect[0].Name;
+                if (place?.MultiSelect.Count > 0)
+                {
+                    plan.Place = place?.MultiSelect[0].Name;
+                }
+                else
+                {
+                    plan.Place = "未定";
+                }
 
                 p.Properties.TryGetValue("用途", out value);
                 RichTextPropertyValue desc = value as RichTextPropertyValue;
-                plan.Desc = desc?.RichText[0].PlainText;
+                if (desc?.RichText.Count > 0)
+                {
+                    plan.Desc = desc?.RichText[0].PlainText;
+                }
 
                 p.Properties.TryGetValue("予定", out value);
                 TitlePropertyValue title = value as TitlePropertyValue;
-                plan.Title = title?.Title[0].PlainText;
+                if (title?.Title.Count > 0)
+                {
+                    plan.Title = title?.Title[0].PlainText;
+                }
 
                 plan.Id = p.Id;
                 plan.Link = p.Url;
-
-                p.Properties.TryGetValue("通知ステータス", out value);
-                StatusPropertyValue status = value as StatusPropertyValue;
-                plan.Status = status.Status.Name;
 
                 plans.Add(plan);
             }

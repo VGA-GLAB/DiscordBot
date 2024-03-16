@@ -36,10 +36,24 @@ class Program
         var list = wrapper.GetCalendar().GetAwaiter().GetResult();
 
         var everyone = roles.Where(r => r.Value.Name == "@everyone").FirstOrDefault().Value;
+        
+        //アナウンスデータをもとにアナウンスする
         foreach (var announce in list)
         {
-            wrapper.UpdateStatus(announce).GetAwaiter().GetResult();
-            continue;
+            if (announce.Status == "予定")
+            {
+                if( (announce.CalcDate - DateTime.Now).TotalDays > 36)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                if ((announce.CalcDate - DateTime.Now).TotalDays > 1)
+                {
+                    continue;
+                }
+            }
 
             string text = "";
             text = string.Format("<@&{0}> \n", everyone.Id);
@@ -70,6 +84,8 @@ class Program
             }
 
             discordAPI.PostMessage(settings.ChannelId, text).Wait();
+
+            wrapper.UpdateStatus(announce).GetAwaiter().GetResult();
         }
     }
 }
