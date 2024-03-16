@@ -78,6 +78,8 @@ namespace DiscordBot
 
                 p.Properties.TryGetValue("日付", out value);
                 DatePropertyValue date = value as DatePropertyValue;
+                if (date?.Date == null) continue;
+
                 if (date.Date.Start != null && date.Date.End != null)
                 {
                     plan.SortDate = date.Date.Start.Value;
@@ -93,7 +95,9 @@ namespace DiscordBot
                 MultiSelectPropertyValue member = value as MultiSelectPropertyValue;
                 if (member?.MultiSelect.Count > 0)
                 {
-                    plan.Team = member?.MultiSelect[0].Name;
+                    var members = member?.MultiSelect.Select(n => n.Name).ToList();
+                    plan.Team = string.Join(" / ", members); //place?.MultiSelect[0].Name;
+                    //plan.Team = member?.MultiSelect[0].Name;
                 }
                 else
                 {
@@ -104,7 +108,8 @@ namespace DiscordBot
                 MultiSelectPropertyValue place = value as MultiSelectPropertyValue;
                 if (place?.MultiSelect.Count > 0)
                 {
-                    plan.Place = place?.MultiSelect[0].Name;
+                    var places = place?.MultiSelect.Select(n => n.Name).ToList();
+                    plan.Place = string.Join(" / ", places); //place?.MultiSelect[0].Name;
                 }
                 else
                 {
