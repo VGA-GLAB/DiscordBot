@@ -42,7 +42,7 @@ class Program
         {
             if (announce.Status == "予定")
             {
-                if( (announce.CalcDate - DateTime.Now).TotalDays > 36)
+                if( (announce.CalcDate.Month - DateTime.Now.Month) >= 2)
                 {
                     continue;
                 }
@@ -55,8 +55,7 @@ class Program
                 }
             }
 
-            string text = "";
-            text = string.Format("<@&{0}> \n", everyone.Id);
+            string text = "@everyone \n";
             if (announce.Status == "予定")
             {
                 text += "G-Lab活動予定日のアナウンスです。\n";
